@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reset Password – Waver</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body style="background-color: black; color: white; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+  <h1 id="title">Resetting your password…</h1>
+
+  <div id="form" style="display: none; flex-direction: column; align-items: center;">
+    <input id="password1" type="password" placeholder="New Password" style="margin: 10px; padding: 10px;">
+    <input id="password2" type="password" placeholder="Confirm New Password" style="margin: 10px; padding: 10px;">
+    <button id="submit" style="padding: 10px 20px; background-color: #0284c7; color: white;">Update Password</button>
+    <p id="error" style="color: #f87171;"></p>
+    <p id="status" style="color: #34d399;"></p>
+  </div>
+
+  <script>
+    const supabase = window.supabase.createClient(
+      'https://vfpcqlulhiwqjnwfxjof.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o'
+    );
+
+    const hash = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hash.get("access_token");
+
+    const title = document.getElementById("title");
+    const form = document.getElementById("form");
+    const errorEl = document.getElementById("error");
+    const statusEl = document.getElementById("status");
+
+    async function start() {
+      if (!accessToken) {
+        title.textContent = "Missing access token.";
+        return;
+      }
+
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: ""
+      });
+
+      if (error || !data.session) {
+        console.error("setSession error:", error);
+        title.textContent = "Could not restore session.";
+        return;
+      }
+
+      // Session restored
+      title.textContent = "Enter your new password";
+      form.style.display = "flex";
+
+      document.getElementById("submit").onclick = async () => {
+        const p1 = document.getElementById("password1").value;
+        const p2 = document.getElementById("password2").value;
+        errorEl.textContent = "";
+        statusEl.textContent = "";
+
+        if (!p1 || !p2) {
+          errorEl.textContent = "Both fields are required.";
+          return;
+        }
+
+        if (p1 !== p2) {
+          errorEl.textContent = "Passwords don't match.";
+          return;
+        }
+
+        const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
+
+        if (updateError) {
+          errorEl.textContent = updateError.message;
+        } else {
+          form.style.display = "none";
+          title.textContent = "Password updated successfully.";
+          statusEl.textContent = "You can now log in.";
+        }
+      };
+    }
+
+    start();
+  </script>
+</body>
+</html>
