@@ -4,44 +4,68 @@
   <meta charset="UTF-8" />
   <title>Reset Password – Waver</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Supabase JS library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
+
 <body style="background-color: black; color: white; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+  
   <h1 id="title">Resetting your password…</h1>
 
+  <!-- This form is hidden by default until we verify the token -->
   <div id="form" style="display: none; flex-direction: column; align-items: center;">
-    <input id="password1" type="password" placeholder="New Password" style="margin: 10px; padding: 10px;" oninput="validateCriteria()">
-    <input id="password2" type="password" placeholder="Confirm New Password" style="margin: 10px; padding: 10px;">
+    <input
+      id="password1"
+      type="password"
+      placeholder="New Password"
+      style="margin: 10px; padding: 10px;"
+      oninput="validateCriteria()"
+    />
+    <input
+      id="password2"
+      type="password"
+      placeholder="Confirm New Password"
+      style="margin: 10px; padding: 10px;"
+    />
 
     <ul style="list-style: none; padding: 0; margin-bottom: 10px; font-size: 0.9rem;">
       <li id="lengthCriteria">❌ At least 8 characters</li>
       <li id="complexityCriteria">❌ Includes letters, a number, and a symbol</li>
     </ul>
 
-    <button id="submit" style="padding: 10px 20px; background-color: #0284c7; color: white;">Update Password</button>
+    <button
+      id="submit"
+      style="padding: 10px 20px; background-color: #0284c7; color: white;"
+    >
+      Update Password
+    </button>
     <p id="error" style="color: #f87171;"></p>
     <p id="status" style="color: #34d399;"></p>
   </div>
 
   <script>
-    // Initialize the Supabase client
+    // 1) Initialize Supabase client
     const supabase = window.supabase.createClient(
-      'https://YOUR_SUPABASE_URL.supabase.co',
-      'YOUR_ANON_PUBLIC_API_KEY'
+      "https://vfpcqlulhiwqjnwfxjof.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o"
     );
 
-    // 1) Grab query params
-    const query = new URLSearchParams(window.location.search);
-    const code = query.get("code");   // This is the reset token
-    const email = query.get("email")?.toLowerCase();
+    // 2) Parse the URL query string to grab the parameters Supabase appended
+    const urlParams = new URLSearchParams(window.location.search);
+    const type = urlParams.get("type");    // likely "recovery"
+    const token = urlParams.get("token");  // the magic code
+    // The email may or may not be appended, depending on your setup.
+    const emailParam = urlParams.get("email")?.toLowerCase();
 
-    // 2) DOM elements
+    // HTML references
     const title = document.getElementById("title");
     const form = document.getElementById("form");
     const errorEl = document.getElementById("error");
     const statusEl = document.getElementById("status");
 
+    // For the criteria checks
     function passwordHasSymbolAndNumber(password) {
+      // Must contain at least one letter, one digit, and one symbol from [!@#$&*._-]
       const regex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$&*._-]).+$/;
       return regex.test(password);
     }
@@ -51,6 +75,7 @@
       const lengthEl = document.getElementById("lengthCriteria");
       const complexityEl = document.getElementById("complexityCriteria");
 
+      // Check length
       if (password.length >= 8) {
         lengthEl.textContent = "✅ At least 8 characters";
         lengthEl.style.color = "#34d399";
@@ -59,6 +84,7 @@
         lengthEl.style.color = "#f87171";
       }
 
+      // Check complexity
       if (passwordHasSymbolAndNumber(password)) {
         complexityEl.textContent = "✅ Includes letters, a number, and a symbol";
         complexityEl.style.color = "#34d399";
@@ -68,29 +94,26 @@
       }
     }
 
+    // 3) Main logic: verify token, then show form if valid
     async function start() {
       console.log("Starting password reset flow...");
-      console.log("Parsed URL:", { code, email });
+      console.log("Parsed URL:", { type, token, emailParam });
 
-      // If the code is missing, we can't do a recovery
-      if (!code) {
-        title.textContent = "Missing code in the URL.";
-        console.error("Missing code parameter");
+      // If missing type or token, we can't verify
+      if (!type || !token) {
+        title.textContent = "Missing token or type in the URL.";
+        console.error("Missing token or type:", { type, token });
         return;
       }
 
+      // Attempt to verify and restore a session
       try {
-        // 3) Verify OTP with supabase.auth.verifyOtp
-        console.log("Calling verifyOtp with:", {
-          type: 'recovery',
-          token: code,
-          email: email
-        });
+        console.log("Calling verifyOtp with:", { type, token, email: emailParam });
 
         const { data, error } = await supabase.auth.verifyOtp({
-          type: 'recovery',
-          token: code,
-          email: email
+          type,
+          token,
+          email: emailParam // if email was included, otherwise you can omit
         });
 
         if (error || !data?.session) {
@@ -100,33 +123,35 @@
         }
 
         console.log("Session restored:", data.session);
-        title.textContent = "Enter your new password below";
+        title.textContent = "Enter your new password below.";
         form.style.display = "flex";
 
-        // 4) On submit, update the user's password
+        // 4) When user clicks update, call supabase.auth.updateUser
         document.getElementById("submit").onclick = async () => {
           const p1 = document.getElementById("password1").value;
           const p2 = document.getElementById("password2").value;
+
           errorEl.textContent = "";
           statusEl.textContent = "";
 
+          // Basic validation
           if (!p1 || !p2) {
             errorEl.textContent = "Both fields are required.";
             return;
           }
-
           if (p1 !== p2) {
             errorEl.textContent = "Passwords don't match.";
             return;
           }
-
           if (p1.length < 8 || !passwordHasSymbolAndNumber(p1)) {
             errorEl.textContent = "Password must meet all criteria.";
             return;
           }
 
           console.log("Calling updateUser with new password");
-          const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
+          const { error: updateError } = await supabase.auth.updateUser({
+            password: p1
+          });
 
           if (updateError) {
             console.error("Password update error:", updateError);
@@ -144,6 +169,7 @@
       }
     }
 
+    // Execute on page load
     start();
   </script>
 </body>
