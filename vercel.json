@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/reset", "destination": "/reset.html" },
+    { "source": "/support", "destination": "/support.html" },
+    { "source": "/confirmation", "destination": "/confirmation.html" },
+    { "source": "/privacy", "destination": "/privacy.html" }
+  ]
+}
