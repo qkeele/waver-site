@@ -31,7 +31,7 @@
 
     const query = new URLSearchParams(window.location.search);
     const code = query.get("code");
-    const email = query.get("email");
+    const email = query.get("email")?.toLowerCase();
 
     const title = document.getElementById("title");
     const form = document.getElementById("form");
@@ -66,57 +66,77 @@
     }
 
     async function start() {
+      console.log("Starting password reset...");
+      console.log("Parsed query params:", { code, email });
+
       if (!code || !email) {
+        console.error("Missing code or email:", { code, email });
         title.textContent = "Missing code or email.";
         return;
       }
 
-      const { data, error } = await supabase.auth.verifyOtp({
-        type: 'recovery',
-        token: code,
-        email: email
-      });
+      try {
+        console.log("Calling verifyOtp with:", {
+          type: 'recovery',
+          token: code,
+          email: email
+        });
 
-      if (error || !data.session) {
-        console.error("verifyOtp error:", error);
-        title.textContent = "Could not restore session.";
-        return;
+        const { data, error } = await supabase.auth.verifyOtp({
+          type: 'recovery',
+          token: code,
+          email: email
+        });
+
+        if (error || !data.session) {
+          console.error("verifyOtp error:", error);
+          title.textContent = "Could not restore session.";
+          return;
+        }
+
+        console.log("Session successfully restored:", data.session);
+
+        title.textContent = "Enter your new password";
+        form.style.display = "flex";
+
+        document.getElementById("submit").onclick = async () => {
+          const p1 = document.getElementById("password1").value;
+          const p2 = document.getElementById("password2").value;
+          errorEl.textContent = "";
+          statusEl.textContent = "";
+
+          if (!p1 || !p2) {
+            errorEl.textContent = "Both fields are required.";
+            return;
+          }
+
+          if (p1 !== p2) {
+            errorEl.textContent = "Passwords don't match.";
+            return;
+          }
+
+          if (p1.length < 8 || !passwordHasSymbolAndNumber(p1)) {
+            errorEl.textContent = "Password must meet all criteria.";
+            return;
+          }
+
+          console.log("Updating password...");
+          const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
+
+          if (updateError) {
+            console.error("Password update error:", updateError);
+            errorEl.textContent = updateError.message;
+          } else {
+            console.log("Password updated successfully");
+            form.style.display = "none";
+            title.textContent = "Password updated successfully.";
+            statusEl.textContent = "You can now log in.";
+          }
+        };
+      } catch (err) {
+        console.error("Unexpected error in start():", err);
+        title.textContent = "An unexpected error occurred.";
       }
-
-      title.textContent = "Enter your new password";
-      form.style.display = "flex";
-
-      document.getElementById("submit").onclick = async () => {
-        const p1 = document.getElementById("password1").value;
-        const p2 = document.getElementById("password2").value;
-        errorEl.textContent = "";
-        statusEl.textContent = "";
-
-        if (!p1 || !p2) {
-          errorEl.textContent = "Both fields are required.";
-          return;
-        }
-
-        if (p1 !== p2) {
-          errorEl.textContent = "Passwords don't match.";
-          return;
-        }
-
-        if (p1.length < 8 || !passwordHasSymbolAndNumber(p1)) {
-          errorEl.textContent = "Password must meet all criteria.";
-          return;
-        }
-
-        const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
-
-        if (updateError) {
-          errorEl.textContent = updateError.message;
-        } else {
-          form.style.display = "none";
-          title.textContent = "Password updated successfully.";
-          statusEl.textContent = "You can now log in.";
-        }
-      };
     }
 
     start();
