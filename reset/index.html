@@ -31,6 +31,7 @@
 
     const query = new URLSearchParams(window.location.search);
     const code = query.get("code");
+    const email = query.get("email")?.toLowerCase();
 
     const title = document.getElementById("title");
     const form = document.getElementById("form");
@@ -65,21 +66,30 @@
     }
 
     async function start() {
-      console.log("Starting password reset flow");
-      console.log("Parsed URL:", { code });
+      console.log("Starting password reset flow...");
+      console.log("Parsed URL:", { code, email });
 
-      if (!code) {
-        title.textContent = "Missing code.";
-        console.error("Missing code");
+      if (!code || !email) {
+        title.textContent = "Missing code or email.";
+        console.error("Missing code or email:", { code, email });
         return;
       }
 
       try {
-        console.log("Calling exchangeCodeForSession with code:", code);
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        console.log("Calling verifyOtp with:", {
+          type: 'recovery',
+          token: code,
+          email: email
+        });
+
+        const { data, error } = await supabase.auth.verifyOtp({
+          type: 'recovery',
+          token: code,
+          email: email
+        });
 
         if (error || !data.session) {
-          console.error("exchangeCodeForSession error:", error);
+          console.error("verifyOtp error:", error);
           title.textContent = "Could not restore session.";
           return;
         }
