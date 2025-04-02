@@ -1,140 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Reset Password</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- 1) Load supabase-js library first -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
-<body style="background: black; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin:0;">
-  <h1 id="title">Checking reset link…</h1>
+<body>
 
-  <div id="form" style="display:none; flex-direction:column; align-items:center;">
-    <input id="p1" type="password" placeholder="New Password" oninput="validate()" style="margin:10px; padding:10px;" />
-    <input id="p2" type="password" placeholder="Confirm New Password" style="margin:10px; padding:10px;" />
+<!-- 2) Minimal instructions / placeholders -->
+<h2 id="status">Checking your reset link...</h2>
+<div id="form" style="display:none;">
+  <p>New Password:</p>
+  <input type="password" id="p1">
+  <p>Confirm New Password:</p>
+  <input type="password" id="p2">
+  <br/><br/>
+  <button id="updateBtn">Update Password</button>
+</div>
+<p id="message" style="color:red;"></p>
 
-    <ul style="list-style:none; padding:0; font-size:0.9rem;">
-      <li id="lengthReq">❌ At least 8 characters</li>
-      <li id="complexReq">❌ Includes letters, a number, and a symbol</li>
-    </ul>
+<script>
+  // 3) Initialize Supabase client
+  const supabase = window.supabase.createClient(
+    "https://vfpcqlulhiwqjnwfxjof.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o"
+  );
 
-    <button id="updateBtn" style="margin:10px; padding:10px 20px; background:#0284c7; color:white;">
-      Update Password
-    </button>
-    <p id="err" style="color:#f87171;"></p>
-    <p id="status" style="color:#34d399;"></p>
-  </div>
+  // Grab the code param (?code=XXXX) from URL
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
 
-  <script>
-    // 1) Initialize Supabase
-    const supabase = supabase.createClient(
-      "https://vfpcqlulhiwqjnwfxjof.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o"
-    );
+  const statusEl = document.getElementById("status");
+  const formEl = document.getElementById("form");
+  const messageEl = document.getElementById("message");
+  const updateBtn = document.getElementById("updateBtn");
 
-    // 2) Parse query string: the reset link might have ?code=xxxx
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
+  // 4) Check if code is present
+  if (!code) {
+    statusEl.textContent = "No code found in URL.";
+  } else {
+    verifyCodeAndShowForm();
+  }
 
-    // DOM references
-    const titleEl = document.getElementById("title");
-    const formEl = document.getElementById("form");
-    const errEl = document.getElementById("err");
-    const statusEl = document.getElementById("status");
-    const lengthReqEl = document.getElementById("lengthReq");
-    const complexReqEl = document.getElementById("complexReq");
+  // 5) Verify the OTP code
+  async function verifyCodeAndShowForm() {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        type: "recovery",
+        token: code
+      });
 
-    function passwordIsValid(pass) {
-      // Must have letter, digit, symbol from [!@#$&*._-], minimum 8 chars
-      const regex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$&*._-]).{8,}$/;
-      return regex.test(pass);
-    }
-
-    function validate() {
-      const pass = document.getElementById("p1").value;
-      // Length check
-      if (pass.length >= 8) {
-        lengthReqEl.textContent = "✅ At least 8 characters";
-        lengthReqEl.style.color = "#34d399";
+      if (error || !data?.session) {
+        console.error(error);
+        statusEl.textContent = "Invalid or expired link.";
       } else {
-        lengthReqEl.textContent = "❌ At least 8 characters";
-        lengthReqEl.style.color = "#f87171";
-      }
-      // Complexity check
-      if (passwordIsValid(pass)) {
-        complexReqEl.textContent = "✅ Includes letters, a number, and a symbol";
-        complexReqEl.style.color = "#34d399";
-      } else {
-        complexReqEl.textContent = "❌ Includes letters, a number, and a symbol";
-        complexReqEl.style.color = "#f87171";
-      }
-    }
+        // If success, show password form
+        statusEl.textContent = "Enter a new password:";
+        formEl.style.display = "block";
 
-    async function main() {
-      // If no code param, can't verify
-      if (!code) {
-        titleEl.textContent = "No code found in URL.";
-        return;
-      }
-
-      // 3) Attempt to verify the recovery code
-      try {
-        titleEl.textContent = "Verifying your link…";
-        const { data, error } = await supabase.auth.verifyOtp({
-          type: "recovery",
-          token: code
-        });
-
-        if (error || !data.session) {
-          console.error("verifyOtp error:", error);
-          titleEl.textContent = "Link invalid or expired.";
-          return;
-        }
-
-        // If we get here, session is restored, show the form
-        titleEl.textContent = "Enter a new password:";
-        formEl.style.display = "flex";
-        console.log("Session restored -> data:", data);
-
-        // 4) On button click, update password
-        document.getElementById("updateBtn").onclick = async () => {
-          errEl.textContent = "";
-          statusEl.textContent = "";
+        // 6) On click, update password
+        updateBtn.onclick = async () => {
+          messageEl.textContent = "";
           const p1 = document.getElementById("p1").value;
           const p2 = document.getElementById("p2").value;
 
           if (!p1 || !p2) {
-            errEl.textContent = "Both fields are required.";
+            messageEl.textContent = "Please enter both fields.";
             return;
           }
           if (p1 !== p2) {
-            errEl.textContent = "Passwords do not match.";
-            return;
-          }
-          if (!passwordIsValid(p1)) {
-            errEl.textContent = "Password must meet all criteria.";
+            messageEl.textContent = "Passwords do not match.";
             return;
           }
 
-          // 5) Call updateUser to set new password
+          // Attempt update
           const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
-
           if (updateError) {
-            console.error("Update error:", updateError);
-            errEl.textContent = updateError.message;
+            console.error(updateError);
+            messageEl.textContent = updateError.message;
           } else {
             formEl.style.display = "none";
-            titleEl.textContent = "Password updated!";
-            statusEl.textContent = "You can now sign in with the new password.";
+            statusEl.textContent = "Password updated successfully! You can now log in.";
           }
         };
-      } catch (err) {
-        console.error("Unexpected error:", err);
-        titleEl.textContent = "Something went wrong.";
       }
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Something went wrong verifying the code.";
     }
+  }
+</script>
 
-    main();
-  </script>
 </body>
 </html>
