@@ -2,175 +2,139 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Reset Password – Waver</title>
+  <title>Reset Password</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- Supabase JS library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
+<body style="background: black; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin:0;">
+  <h1 id="title">Checking reset link…</h1>
 
-<body style="background-color: black; color: white; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0;">
-  
-  <h1 id="title">Resetting your password…</h1>
+  <div id="form" style="display:none; flex-direction:column; align-items:center;">
+    <input id="p1" type="password" placeholder="New Password" oninput="validate()" style="margin:10px; padding:10px;" />
+    <input id="p2" type="password" placeholder="Confirm New Password" style="margin:10px; padding:10px;" />
 
-  <!-- This form is hidden by default until we verify the token -->
-  <div id="form" style="display: none; flex-direction: column; align-items: center;">
-    <input
-      id="password1"
-      type="password"
-      placeholder="New Password"
-      style="margin: 10px; padding: 10px;"
-      oninput="validateCriteria()"
-    />
-    <input
-      id="password2"
-      type="password"
-      placeholder="Confirm New Password"
-      style="margin: 10px; padding: 10px;"
-    />
-
-    <ul style="list-style: none; padding: 0; margin-bottom: 10px; font-size: 0.9rem;">
-      <li id="lengthCriteria">❌ At least 8 characters</li>
-      <li id="complexityCriteria">❌ Includes letters, a number, and a symbol</li>
+    <ul style="list-style:none; padding:0; font-size:0.9rem;">
+      <li id="lengthReq">❌ At least 8 characters</li>
+      <li id="complexReq">❌ Includes letters, a number, and a symbol</li>
     </ul>
 
-    <button
-      id="submit"
-      style="padding: 10px 20px; background-color: #0284c7; color: white;"
-    >
+    <button id="updateBtn" style="margin:10px; padding:10px 20px; background:#0284c7; color:white;">
       Update Password
     </button>
-    <p id="error" style="color: #f87171;"></p>
-    <p id="status" style="color: #34d399;"></p>
+    <p id="err" style="color:#f87171;"></p>
+    <p id="status" style="color:#34d399;"></p>
   </div>
 
   <script>
-    // 1) Initialize Supabase client
-    const supabase = window.supabase.createClient(
+    // 1) Initialize Supabase
+    const supabase = supabase.createClient(
       "https://vfpcqlulhiwqjnwfxjof.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o"
     );
 
-    // 2) Parse the URL query string to grab the parameters Supabase appended
-    const urlParams = new URLSearchParams(window.location.search);
-    const type = urlParams.get("type");    // likely "recovery"
-    const token = urlParams.get("token");  // the magic code
-    // The email may or may not be appended, depending on your setup.
-    const emailParam = urlParams.get("email")?.toLowerCase();
+    // 2) Parse query string: the reset link might have ?code=xxxx
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
 
-    // HTML references
-    const title = document.getElementById("title");
-    const form = document.getElementById("form");
-    const errorEl = document.getElementById("error");
+    // DOM references
+    const titleEl = document.getElementById("title");
+    const formEl = document.getElementById("form");
+    const errEl = document.getElementById("err");
     const statusEl = document.getElementById("status");
+    const lengthReqEl = document.getElementById("lengthReq");
+    const complexReqEl = document.getElementById("complexReq");
 
-    // For the criteria checks
-    function passwordHasSymbolAndNumber(password) {
-      // Must contain at least one letter, one digit, and one symbol from [!@#$&*._-]
-      const regex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$&*._-]).+$/;
-      return regex.test(password);
+    function passwordIsValid(pass) {
+      // Must have letter, digit, symbol from [!@#$&*._-], minimum 8 chars
+      const regex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$&*._-]).{8,}$/;
+      return regex.test(pass);
     }
 
-    function validateCriteria() {
-      const password = document.getElementById("password1").value;
-      const lengthEl = document.getElementById("lengthCriteria");
-      const complexityEl = document.getElementById("complexityCriteria");
-
-      // Check length
-      if (password.length >= 8) {
-        lengthEl.textContent = "✅ At least 8 characters";
-        lengthEl.style.color = "#34d399";
+    function validate() {
+      const pass = document.getElementById("p1").value;
+      // Length check
+      if (pass.length >= 8) {
+        lengthReqEl.textContent = "✅ At least 8 characters";
+        lengthReqEl.style.color = "#34d399";
       } else {
-        lengthEl.textContent = "❌ At least 8 characters";
-        lengthEl.style.color = "#f87171";
+        lengthReqEl.textContent = "❌ At least 8 characters";
+        lengthReqEl.style.color = "#f87171";
       }
-
-      // Check complexity
-      if (passwordHasSymbolAndNumber(password)) {
-        complexityEl.textContent = "✅ Includes letters, a number, and a symbol";
-        complexityEl.style.color = "#34d399";
+      // Complexity check
+      if (passwordIsValid(pass)) {
+        complexReqEl.textContent = "✅ Includes letters, a number, and a symbol";
+        complexReqEl.style.color = "#34d399";
       } else {
-        complexityEl.textContent = "❌ Includes letters, a number, and a symbol";
-        complexityEl.style.color = "#f87171";
+        complexReqEl.textContent = "❌ Includes letters, a number, and a symbol";
+        complexReqEl.style.color = "#f87171";
       }
     }
 
-    // 3) Main logic: verify token, then show form if valid
-    async function start() {
-      console.log("Starting password reset flow...");
-      console.log("Parsed URL:", { type, token, emailParam });
-
-      // If missing type or token, we can't verify
-      if (!type || !token) {
-        title.textContent = "Missing token or type in the URL.";
-        console.error("Missing token or type:", { type, token });
+    async function main() {
+      // If no code param, can't verify
+      if (!code) {
+        titleEl.textContent = "No code found in URL.";
         return;
       }
 
-      // Attempt to verify and restore a session
+      // 3) Attempt to verify the recovery code
       try {
-        console.log("Calling verifyOtp with:", { type, token, email: emailParam });
-
+        titleEl.textContent = "Verifying your link…";
         const { data, error } = await supabase.auth.verifyOtp({
-          type,
-          token,
-          email: emailParam // if email was included, otherwise you can omit
+          type: "recovery",
+          token: code
         });
 
-        if (error || !data?.session) {
+        if (error || !data.session) {
           console.error("verifyOtp error:", error);
-          title.textContent = "Could not restore session. The link may be invalid or expired.";
+          titleEl.textContent = "Link invalid or expired.";
           return;
         }
 
-        console.log("Session restored:", data.session);
-        title.textContent = "Enter your new password below.";
-        form.style.display = "flex";
+        // If we get here, session is restored, show the form
+        titleEl.textContent = "Enter a new password:";
+        formEl.style.display = "flex";
+        console.log("Session restored -> data:", data);
 
-        // 4) When user clicks update, call supabase.auth.updateUser
-        document.getElementById("submit").onclick = async () => {
-          const p1 = document.getElementById("password1").value;
-          const p2 = document.getElementById("password2").value;
-
-          errorEl.textContent = "";
+        // 4) On button click, update password
+        document.getElementById("updateBtn").onclick = async () => {
+          errEl.textContent = "";
           statusEl.textContent = "";
+          const p1 = document.getElementById("p1").value;
+          const p2 = document.getElementById("p2").value;
 
-          // Basic validation
           if (!p1 || !p2) {
-            errorEl.textContent = "Both fields are required.";
+            errEl.textContent = "Both fields are required.";
             return;
           }
           if (p1 !== p2) {
-            errorEl.textContent = "Passwords don't match.";
+            errEl.textContent = "Passwords do not match.";
             return;
           }
-          if (p1.length < 8 || !passwordHasSymbolAndNumber(p1)) {
-            errorEl.textContent = "Password must meet all criteria.";
+          if (!passwordIsValid(p1)) {
+            errEl.textContent = "Password must meet all criteria.";
             return;
           }
 
-          console.log("Calling updateUser with new password");
-          const { error: updateError } = await supabase.auth.updateUser({
-            password: p1
-          });
+          // 5) Call updateUser to set new password
+          const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
 
           if (updateError) {
-            console.error("Password update error:", updateError);
-            errorEl.textContent = updateError.message;
+            console.error("Update error:", updateError);
+            errEl.textContent = updateError.message;
           } else {
-            form.style.display = "none";
-            title.textContent = "Password updated successfully!";
-            statusEl.textContent = "You can now log in.";
-            console.log("Password updated successfully.");
+            formEl.style.display = "none";
+            titleEl.textContent = "Password updated!";
+            statusEl.textContent = "You can now sign in with the new password.";
           }
         };
       } catch (err) {
-        console.error("Unexpected error in reset flow:", err);
-        title.textContent = "An unexpected error occurred.";
+        console.error("Unexpected error:", err);
+        titleEl.textContent = "Something went wrong.";
       }
     }
 
-    // Execute on page load
-    start();
+    main();
   </script>
 </body>
 </html>
