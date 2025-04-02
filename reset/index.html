@@ -70,10 +70,13 @@
         return;
       }
 
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      const { data, error } = await supabase.auth.verifyOtp({
+        type: 'recovery',
+        token: code
+      });
 
       if (error || !data.session) {
-        console.error("exchangeCodeForSession error:", error);
+        console.error("verifyOtp error:", error);
         title.textContent = "Could not restore session.";
         return;
       }
