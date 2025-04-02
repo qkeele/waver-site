@@ -2,94 +2,137 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Waver - Enter Reset Code</title>
+  <title>Waver - Reset Password</title>
+
+  <!-- 1) Load supabase-js BEFORE any script that uses `supabase` -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body style="font-family: Arial, sans-serif; padding: 20px; max-width:600px; margin:0 auto;">
-
   <h1>Reset Your Waver Password</h1>
-  <p>Enter the code from your email, then pick a new password.</p>
+  <p style="max-width: 450px;">
+    Enter the <strong>one-time code</strong> from your email and choose a new password.
+    Your email address is already filled in below from the link you clicked.
+  </p>
 
-  <!-- The form: Email, OTP Code, and new password fields -->
+  <!-- The form: Email (read-only), OTP code, and new password fields -->
   <div style="margin-top: 20px;">
-    <label for="email">Email</label><br>
-    <input id="email" type="email" style="width: 250px; margin-bottom:10px;"><br><br>
+    <label for="email" style="font-weight:bold;">Email Address</label><br>
+    <input
+      id="email"
+      type="email"
+      style="width: 300px; margin-bottom:10px;"
+      readonly
+    ><br><br>
 
-    <label for="otpCode">Reset Code</label><br>
-    <input id="otpCode" type="text" placeholder="Paste your code here" style="width: 250px; margin-bottom:10px;"><br><br>
+    <label for="otpCode" style="font-weight:bold;">One-Time Code</label><br>
+    <input
+      id="otpCode"
+      type="text"
+      placeholder="Paste the code from your email"
+      style="width: 300px; margin-bottom:10px;"
+    ><br><br>
 
-    <label for="p1">New Password</label><br>
-    <input id="p1" type="password" style="width: 250px; margin-bottom:10px;"><br><br>
+    <label for="p1" style="font-weight:bold;">New Password</label><br>
+    <input
+      id="p1"
+      type="password"
+      style="width: 300px; margin-bottom:10px;"
+      placeholder="Enter new password"
+    ><br><br>
 
-    <label for="p2">Confirm New Password</label><br>
-    <input id="p2" type="password" style="width: 250px; margin-bottom:10px;"><br><br>
+    <label for="p2" style="font-weight:bold;">Confirm New Password</label><br>
+    <input
+      id="p2"
+      type="password"
+      style="width: 300px; margin-bottom:10px;"
+      placeholder="Confirm new password"
+    ><br><br>
 
-    <button id="resetBtn" style="padding: 10px 20px; background: #0284c7; color: #fff; border: none; cursor: pointer;">
+    <button
+      id="resetBtn"
+      style="padding: 10px 20px; background: #0284c7; color: #fff; border: none; cursor: pointer;"
+    >
       Reset Password
     </button>
   </div>
 
+  <!-- Display any error or success message here -->
   <p id="msg" style="color:red; margin-top:20px;"></p>
 
   <script>
-    // 1) Initialize your Supabase client
-    const supabase = supabase.createClient(
+    // 2) Initialize your Supabase client with the REAL credentials
+    //    from your messages. No placeholders.
+    const supabase = window.supabase.createClient(
       "https://vfpcqlulhiwqjnwfxjof.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o"
     );
 
-    // 2) If "?email=something" is in the URL, prefill it
+    // 3) Pull `email=...` from the URL if present
     const params = new URLSearchParams(window.location.search);
     const emailFromUrl = params.get("email");
+
+    // 4) Pre-fill the read-only email field
+    const emailEl = document.getElementById("email");
     if (emailFromUrl) {
-      document.getElementById("email").value = decodeURIComponent(emailFromUrl);
+      emailEl.value = decodeURIComponent(emailFromUrl);
+    } else {
+      emailEl.value = "";
     }
 
-    // 3) Handle the Reset button click
-    document.getElementById("resetBtn").onclick = async function(e) {
+    // 5) When user clicks "Reset Password"
+    document.getElementById("resetBtn").onclick = async (e) => {
       e.preventDefault();
+
       const msgEl = document.getElementById("msg");
+      msgEl.style.color = "red";
       msgEl.textContent = "";
 
-      // Gather fields
-      const email = document.getElementById("email").value.trim();
+      // Gather the user inputs
+      const email = emailEl.value.trim();
       const code = document.getElementById("otpCode").value.trim();
       const p1 = document.getElementById("p1").value;
       const p2 = document.getElementById("p2").value;
 
+      // Basic validation
       if (!email || !code || !p1 || !p2) {
-        msgEl.textContent = "All fields are required.";
+        msgEl.textContent = "Please fill in all fields.";
         return;
       }
       if (p1 !== p2) {
-        msgEl.textContent = "Passwords don't match.";
+        msgEl.textContent = "Passwords do not match.";
         return;
       }
 
-      // 4) First, verify the code:
-      const { data, error } = await supabase.auth.verifyOtp({
-        type: "recovery",
-        token: code,
-        email: email
-      });
+      try {
+        // 6) First, verify the one-time code from the email
+        const { data, error } = await supabase.auth.verifyOtp({
+          type: "recovery",
+          token: code,
+          email: email
+        });
 
-      if (error || !data?.session) {
-        console.error("verifyOtp error:", error);
-        msgEl.textContent = error?.message || "Invalid code or token expired.";
-        return;
+        if (error || !data?.session) {
+          console.error("verifyOtp error:", error);
+          msgEl.textContent = error?.message || "Invalid or expired code.";
+          return;
+        }
+
+        // 7) If code verified, update the user's password
+        const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
+
+        if (updateError) {
+          console.error("updateUser error:", updateError);
+          msgEl.textContent = updateError.message;
+          return;
+        }
+
+        // 8) Success - show a success message
+        msgEl.style.color = "green";
+        msgEl.textContent = "Password updated successfully! You can now log in.";
+      } catch (err) {
+        console.error("Caught exception:", err);
+        msgEl.textContent = "Something went wrong.";
       }
-
-      // 5) If code verified, update the password
-      const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
-      if (updateError) {
-        console.error("updateUser error:", updateError);
-        msgEl.textContent = updateError.message;
-        return;
-      }
-
-      // 6) Success
-      msgEl.style.color = "green";
-      msgEl.textContent = "Password updated successfully! You can log in now.";
     };
   </script>
 </body>
