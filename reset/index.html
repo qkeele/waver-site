@@ -2,100 +2,140 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Reset Password</title>
-  <!-- 1) Load supabase-js library first -->
+  <title>Reset Password – Debug Mode</title>
+  <!-- 1) Load supabase-js library FIRST -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
-<body style="font-family:sans-serif; margin:20px;">
-<h2 id="status">Checking your reset link...</h2>
+<body style="font-family: sans-serif; margin: 20px;">
 
-<div id="form" style="display:none;">
-  <p>New Password:</p>
-  <input type="password" id="p1" style="margin-bottom:10px;">
-  <p>Confirm Password:</p>
-  <input type="password" id="p2" style="margin-bottom:10px;">
-  <br/>
+<h2 id="status">Loading…</h2>
+
+<div id="form" style="display: none; margin-top: 20px;">
+  <p>Enter new password:</p>
+  <input id="p1" type="password" style="margin-bottom: 10px; width: 200px;" />
+  <p>Confirm new password:</p>
+  <input id="p2" type="password" style="margin-bottom: 10px; width: 200px;" />
+  <br />
   <button id="updateBtn">Update Password</button>
 </div>
 
-<p id="message" style="color:red;"></p>
+<p id="message" style="color: red;"></p>
 
 <script>
-  // 2) REAL Supabase project details
-  //    (from your earlier code, you said these are correct)
+  // --------------------------------------------------------------------------
+  // 2) Initialize Supabase with your actual project details
+  //    (from your messages, these are correct)
+  // --------------------------------------------------------------------------
+  console.log("DEBUG: Initializing Supabase client…");
   const supabase = window.supabase.createClient(
     "https://vfpcqlulhiwqjnwfxjof.supabase.co",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o"
   );
+  console.log("DEBUG: Supabase client initialized:", supabase);
 
-  // 3) Parse URL params (we expect ?code=... &email=...)
+  // --------------------------------------------------------------------------
+  // 3) Grab query params from the URL (e.g. ?code=xxx&email=xxx)
+  // --------------------------------------------------------------------------
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const email = params.get("email");
 
+  console.log("DEBUG: URLSearchParams:", {
+    code,
+    email,
+    fullQueryString: window.location.search
+  });
+
+  // DOM references
   const statusEl = document.getElementById("status");
   const formEl = document.getElementById("form");
-  const msgEl = document.getElementById("message");
+  const messageEl = document.getElementById("message");
   const updateBtn = document.getElementById("updateBtn");
 
-  // If code or email missing, can't verify
+  // If code or email is missing, we can't proceed
   if (!code || !email) {
-    statusEl.textContent = "Missing code or email in the link.";
+    console.log("DEBUG: code or email is missing in the URL.");
+    statusEl.textContent = "Link is missing code or email param.";
   } else {
+    statusEl.textContent = "Verifying your link…";
     verifyCode();
   }
 
+  // --------------------------------------------------------------------------
+  // 4) Attempt to verify the code with supabase.auth.verifyOtp
+  // --------------------------------------------------------------------------
   async function verifyCode() {
+    console.log("DEBUG: Calling verifyOtp with:", {
+      type: "recovery",
+      token: code,
+      email: email
+    });
+
     try {
-      // 4) Attempt to verify the OTP (type: 'recovery')
       const { data, error } = await supabase.auth.verifyOtp({
         type: "recovery",
         token: code,
         email: email
       });
 
-      // If there's an error or no session, token is invalid/expired
-      if (error || !data?.session) {
-        console.error("verifyOtp error:", error);
+      console.log("DEBUG: verifyOtp response =>", { data, error });
+
+      if (error || !data || !data.session) {
+        // If we got an error or there's no session, token is likely invalid/expired
+        console.error("DEBUG: verifyOtp error or missing session:", error);
         statusEl.textContent = "Link invalid or expired.";
-      } else {
-        // If success, show form for new password
-        statusEl.textContent = "Enter a new password:";
-        formEl.style.display = "block";
-
-        updateBtn.onclick = async () => {
-          msgEl.textContent = "";
-          const p1 = document.getElementById("p1").value;
-          const p2 = document.getElementById("p2").value;
-
-          if (!p1 || !p2) {
-            msgEl.textContent = "Both fields required.";
-            return;
-          }
-          if (p1 !== p2) {
-            msgEl.textContent = "Passwords don't match.";
-            return;
-          }
-
-          // 5) Update password
-          const { error: updateError } = await supabase.auth.updateUser({
-            password: p1
-          });
-
-          if (updateError) {
-            console.error("updateUser error:", updateError);
-            msgEl.textContent = updateError.message;
-          } else {
-            formEl.style.display = "none";
-            statusEl.textContent = "Password updated successfully!";
-          }
-        };
+        messageEl.textContent = error?.message || "Token is invalid or has expired.";
+        return;
       }
+
+      // If verifyOtp succeeded, show the password form
+      statusEl.textContent = "Enter your new password:";
+      formEl.style.display = "block";
+
+      // ------------------------------------------------------------------------
+      // 5) When user clicks update, call supabase.auth.updateUser({ password })
+      // ------------------------------------------------------------------------
+      updateBtn.onclick = async () => {
+        messageEl.textContent = "";
+        const p1 = document.getElementById("p1").value;
+        const p2 = document.getElementById("p2").value;
+
+        console.log("DEBUG: Attempting password update with p1/p2:", { p1, p2 });
+
+        if (!p1 || !p2) {
+          messageEl.textContent = "Both fields are required.";
+          console.warn("DEBUG: Password fields missing input.");
+          return;
+        }
+        if (p1 !== p2) {
+          messageEl.textContent = "Passwords do not match.";
+          console.warn("DEBUG: Passwords mismatch.");
+          return;
+        }
+
+        // Optional: Add more checks, like length, symbol, etc.
+
+        console.log("DEBUG: Calling supabase.auth.updateUser({ password: p1 })…");
+        const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
+
+        console.log("DEBUG: updateUser response =>", { updateError });
+
+        if (updateError) {
+          console.error("DEBUG: updateUser error:", updateError);
+          messageEl.textContent = updateError.message;
+        } else {
+          console.log("DEBUG: Password updated successfully!");
+          formEl.style.display = "none";
+          statusEl.textContent = "Password updated successfully!";
+        }
+      };
     } catch (err) {
-      console.error("Exception verifying code:", err);
-      statusEl.textContent = "Something went wrong verifying the code.";
+      console.error("DEBUG: Caught exception in verifyCode:", err);
+      statusEl.textContent = "Something went wrong verifying your link.";
+      messageEl.textContent = err.message || "Unknown error.";
     }
   }
 </script>
+
 </body>
 </html>
