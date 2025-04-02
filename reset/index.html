@@ -31,6 +31,7 @@
 
     const query = new URLSearchParams(window.location.search);
     const code = query.get("code");
+    const email = query.get("email");
 
     const title = document.getElementById("title");
     const form = document.getElementById("form");
@@ -65,14 +66,15 @@
     }
 
     async function start() {
-      if (!code) {
-        title.textContent = "Missing code.";
+      if (!code || !email) {
+        title.textContent = "Missing code or email.";
         return;
       }
 
       const { data, error } = await supabase.auth.verifyOtp({
         type: 'recovery',
-        token: code
+        token: code,
+        email: email
       });
 
       if (error || !data.session) {
