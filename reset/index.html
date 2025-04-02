@@ -3,85 +3,75 @@
 <head>
   <meta charset="UTF-8">
   <title>Reset Password</title>
-  <!-- 1) Load supabase-js library first -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body>
-
-<!-- 2) Minimal instructions / placeholders -->
-<h2 id="status">Checking your reset link...</h2>
+<h2 id="status">Checking link...</h2>
 <div id="form" style="display:none;">
   <p>New Password:</p>
-  <input type="password" id="p1">
-  <p>Confirm New Password:</p>
-  <input type="password" id="p2">
-  <br/><br/>
+  <input id="p1" type="password">
+  <p>Confirm Password:</p>
+  <input id="p2" type="password">
   <button id="updateBtn">Update Password</button>
 </div>
 <p id="message" style="color:red;"></p>
 
 <script>
-  // 3) Initialize Supabase client
+  // 1) Supabase init
   const supabase = window.supabase.createClient(
-    "https://vfpcqlulhiwqjnwfxjof.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcGNxbHVsaGl3cWpud2Z4am9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk0NDEzNjMsImV4cCI6MjA1NTAxNzM2M30.wvRniBlP_Ucn_rQ0fEid_YiT4VHf106zFbBu3wCIg-o"
+    "https://YOUR-PROJECT.supabase.co",
+    "YOUR_ANON_PUBLIC_KEY"
   );
 
-  // Grab the code param (?code=XXXX) from URL
+  // 2) Parse ?code=... and ?email=...
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
+  const email = params.get("email"); // <— Must exist if you’re using email-based auth
 
   const statusEl = document.getElementById("status");
   const formEl = document.getElementById("form");
-  const messageEl = document.getElementById("message");
+  const msgEl = document.getElementById("message");
   const updateBtn = document.getElementById("updateBtn");
 
-  // 4) Check if code is present
-  if (!code) {
-    statusEl.textContent = "No code found in URL.";
+  if (!code || !email) {
+    statusEl.textContent = "Link is missing 'code' or 'email'.";
   } else {
-    verifyCodeAndShowForm();
+    verifyCode();
   }
 
-  // 5) Verify the OTP code
-  async function verifyCodeAndShowForm() {
+  async function verifyCode() {
     try {
+      // 3) Pass code + email to verify
       const { data, error } = await supabase.auth.verifyOtp({
         type: "recovery",
-        token: code
+        token: code,
+        email: email
       });
 
       if (error || !data?.session) {
-        console.error(error);
-        statusEl.textContent = "Invalid or expired link.";
+        console.error("verifyOtp error:", error);
+        statusEl.textContent = "Link invalid or expired.";
       } else {
-        // If success, show password form
         statusEl.textContent = "Enter a new password:";
         formEl.style.display = "block";
 
-        // 6) On click, update password
+        // 4) Handle password update
         updateBtn.onclick = async () => {
-          messageEl.textContent = "";
+          msgEl.textContent = "";
           const p1 = document.getElementById("p1").value;
           const p2 = document.getElementById("p2").value;
-
-          if (!p1 || !p2) {
-            messageEl.textContent = "Please enter both fields.";
-            return;
-          }
-          if (p1 !== p2) {
-            messageEl.textContent = "Passwords do not match.";
+          if (!p1 || !p2 || p1 !== p2) {
+            msgEl.textContent = "Please make sure both passwords match.";
             return;
           }
 
-          // Attempt update
           const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
           if (updateError) {
             console.error(updateError);
-            messageEl.textContent = updateError.message;
+            msgEl.textContent = updateError.message;
           } else {
             formEl.style.display = "none";
-            statusEl.textContent = "Password updated successfully! You can now log in.";
+            statusEl.textContent = "Password updated successfully!";
           }
         };
       }
@@ -91,6 +81,5 @@
     }
   }
 </script>
-
 </body>
 </html>
